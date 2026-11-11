@@ -1,0 +1,1423 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Simulador Formal de Autómatas de Pila (PDA)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    .stack-item {
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .node-circle {
+      transition: stroke 0.25s, stroke-width 0.25s, filter 0.25s;
+    }
+    .active-node {
+      filter: drop-shadow(0 0 10px rgba(59, 130, 246, 0.85));
+    }
+    .active-branch-node {
+      filter: drop-shadow(0 0 12px rgba(168, 85, 247, 0.9));
+    }
+    .active-row {
+      background-color: rgba(59, 130, 246, 0.3) !important;
+      border-left: 4px solid #3b82f6 !important;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-slate-100 p-4 md:p-6 min-h-screen font-sans">
+  <div class="max-w-6xl mx-auto space-y-5">
+    
+    <!-- Encabezado Principal -->
+    <header class="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-700/60 pb-4">
+      <div>
+        <h1 class="text-2xl font-bold bg-gradient-to-r from-blue-400 via-indigo-300 to-teal-300 bg-clip-text text-transparent">
+          Simulador Formal de Autómatas de Pila (PDA)
+        </h1>
+        <p class="text-sm text-slate-400 mt-0.5">
+          Estructura matemática de 7 componentes, tabla organizada de estados $\delta$ y ejecución interactiva paso a paso.
+        </p>
+      </div>
+
+      <!-- Selector de Ejemplo Organizado -->
+      <div class="flex items-center gap-2">
+        <label for="exampleSelect" class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Ejemplo:</label>
+        <select id="exampleSelect" class="bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 max-w-[340px]">
+          <!-- Opciones inyectadas por JS -->
+        </select>
+      </div>
+    </header>
+
+    <!-- TARJETA DE CLASIFICACIÓN (DPDA VS NPDA) -->
+    <div id="classificationCard" class="rounded-xl border border-blue-500/40 bg-gradient-to-r from-blue-950/40 to-slate-900 p-4 shadow-md transition-all">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-700/50 pb-2.5">
+        <div class="flex items-center gap-3">
+          <span id="typeBadge" class="px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+            🟢 Autómata Determinista (DPDA)
+          </span>
+          <h2 id="exampleTitle" class="text-base font-bold text-white tracking-wide">
+            1. Palíndromo con Centro (w c wᴿ)
+          </h2>
+        </div>
+        <div id="branchStatusContainer" class="hidden items-center gap-2 text-xs font-mono bg-purple-950/70 text-purple-300 px-3 py-1 rounded-lg border border-purple-500/40">
+          <span>Ramas concurrentes en exploración:</span>
+          <span id="activeBranchesCount" class="font-bold text-white px-1.5 py-0.5 bg-purple-800 rounded">1</span>
+        </div>
+      </div>
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3 text-xs">
+        <div>
+          <span class="font-semibold text-slate-300 block mb-1">Fundamento Teórico:</span>
+          <p id="whyText" class="text-slate-400 leading-relaxed"></p>
+        </div>
+        <div class="bg-slate-900/60 p-2.5 rounded-lg border border-slate-700/50">
+          <span class="font-semibold text-blue-300 block mb-0.5">Criterio del Lector Ciego:</span>
+          <p id="blindReaderText" class="text-slate-400 text-[11px] leading-relaxed"></p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ESTRUCTURA FORMAL DE 7 COMPONENTES -->
+    <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 shadow-md">
+      <div class="flex items-center justify-between border-b border-slate-700/60 pb-2 mb-3">
+        <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+          <svg class="w-4 h-4 text-teal-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+          Definición Matemática Formal (7 Tupla): M = (Q, Σ, Γ, δ, q₀, Z₀, F)
+        </span>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5 text-xs font-mono">
+        <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-700/60">
+          <span class="text-[10px] text-slate-400 uppercase font-sans font-semibold block">Q (Estados)</span>
+          <span id="tupleQ" class="text-blue-300 font-bold text-sm block mt-0.5">{ q₀, q₁, q₂ }</span>
+        </div>
+        <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-700/60">
+          <span class="text-[10px] text-slate-400 uppercase font-sans font-semibold block">Σ (Alfabeto Cinta)</span>
+          <span id="tupleSigma" class="text-emerald-300 font-bold text-sm block mt-0.5">{ a, b, c }</span>
+        </div>
+        <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-700/60">
+          <span class="text-[10px] text-slate-400 uppercase font-sans font-semibold block">Γ (Alfabeto Pila)</span>
+          <span id="tupleGamma" class="text-purple-300 font-bold text-sm block mt-0.5">{ Z₀, A, B }</span>
+        </div>
+        <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-700/60">
+          <span class="text-[10px] text-slate-400 uppercase font-sans font-semibold block">q₀ (Estado Inicial)</span>
+          <span id="tupleQ0" class="text-amber-300 font-bold text-sm block mt-0.5">q₀</span>
+        </div>
+        <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-700/60">
+          <span class="text-[10px] text-slate-400 uppercase font-sans font-semibold block">Z₀ (Fondo Pila)</span>
+          <span id="tupleZ0" class="text-rose-300 font-bold text-sm block mt-0.5">Z₀</span>
+        </div>
+        <div class="bg-slate-900 p-2.5 rounded-lg border border-slate-700/60">
+          <span class="text-[10px] text-slate-400 uppercase font-sans font-semibold block">F (Estados Finales)</span>
+          <span id="tupleF" class="text-cyan-300 font-bold text-sm block mt-0.5">{ q₂ }</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Barra de Control y Entrada -->
+    <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 shadow-md space-y-3">
+      <div class="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        
+        <!-- Entrada -->
+        <div class="flex items-center gap-2 flex-1">
+          <label for="inputString" class="text-xs font-semibold text-slate-400 uppercase tracking-wider whitespace-nowrap">Cadena:</label>
+          <input type="text" id="inputString" class="bg-slate-900 border border-slate-700 text-white font-mono text-sm rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 flex-1 max-w-sm" placeholder="Ej: abcba">
+          <button id="btnLoad" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 active:scale-95 transition text-slate-200">
+            Cargar
+          </button>
+        </div>
+
+        <!-- Botones de Acción -->
+        <div class="flex items-center gap-2 flex-wrap">
+          <button id="btnStep" class="px-4 py-1.5 text-xs font-semibold rounded-lg bg-blue-600 hover:bg-blue-500 active:scale-95 transition text-white shadow-sm flex items-center gap-1">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+            Paso a Paso
+          </button>
+          <button id="btnPlay" class="px-4 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-95 transition text-white shadow-sm flex items-center gap-1">
+            <span id="playIcon">▶</span>
+            <span id="playText">Auto</span>
+          </button>
+          <button id="btnReset" class="px-3 py-1.5 text-xs font-semibold rounded-lg bg-slate-700 hover:bg-slate-600 active:scale-95 transition text-slate-300">
+            Reiniciar
+          </button>
+          <div class="flex items-center gap-1.5 text-xs text-slate-400 ml-1">
+            <span>Velocidad:</span>
+            <input type="range" id="speedRange" min="200" max="1500" value="800" class="w-20 accent-blue-500">
+          </div>
+        </div>
+      </div>
+
+      <!-- Cadenas predefinidas de prueba -->
+      <div class="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
+        <span class="font-semibold uppercase tracking-wider text-[10px]">Cadenas sugeridas:</span>
+        <div id="presetBadges" class="flex items-center gap-1.5 flex-wrap">
+          <!-- Inyectado dinámicamente -->
+        </div>
+      </div>
+    </div>
+
+    <!-- Visualización: Cinta de Entrada -->
+    <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 shadow-md space-y-2">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold text-slate-300 uppercase tracking-wider">Cinta de Entrada</span>
+        <span id="tapePositionLabel" class="text-xs font-mono text-slate-400">Posición Cabezal: 0 / 0</span>
+      </div>
+      <div id="tapeContainer" class="flex items-center gap-1.5 overflow-x-auto py-2 px-1">
+        <!-- Celdas de la cinta inyectadas por JS -->
+      </div>
+    </div>
+
+    <!-- Visualización Principal: Diagrama de Estados + Pila LIFO -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      
+      <!-- DIAGRAMA DE GRAFO DE ESTADOS (SVG) -->
+      <div class="lg:col-span-2 bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 shadow-md flex flex-col justify-between">
+        <div class="flex items-center justify-between border-b border-slate-700/50 pb-2 mb-2">
+          <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+            Diagrama de Estados
+          </span>
+          <span class="text-[11px] font-mono text-slate-400 bg-slate-900/60 px-2 py-0.5 rounded border border-slate-700/50">
+            Formato arista: <code class="text-amber-300 font-bold">(tomado, pop, push)</code>
+          </span>
+        </div>
+
+        <div class="relative w-full h-[270px] bg-slate-950/60 rounded-lg border border-slate-800 flex items-center justify-center overflow-hidden">
+          <svg id="graphSvg" class="w-full h-full" viewBox="0 0 600 270">
+            <!-- Renderizado dinámicamente -->
+          </svg>
+        </div>
+      </div>
+
+      <!-- MEMORIA PILA (LIFO) -->
+      <div class="bg-slate-800/80 border border-slate-700/80 rounded-xl p-4 shadow-md flex flex-col">
+        <div class="flex items-center justify-between border-b border-slate-700/50 pb-2 mb-2">
+          <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+            <svg class="w-4 h-4 text-purple-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+            Memoria Pila (LIFO)
+          </span>
+          <span id="stackSizeLabel" class="text-xs font-mono text-slate-400">1 elementos</span>
+        </div>
+
+        <!-- Contenedor Pila -->
+        <div class="flex-1 bg-slate-950/60 rounded-lg border border-dashed border-slate-700/70 p-3 flex flex-col justify-end items-center min-h-[220px]">
+          <div class="text-[10px] text-blue-400 mb-1 uppercase tracking-wider font-semibold">▲ Cima (TOP) ▲</div>
+          <div id="stackContainer" class="w-3/4 max-w-[200px] flex flex-col-reverse gap-1.5">
+            <!-- Elementos de pila inyectados por JS -->
+          </div>
+          <div class="w-full border-t border-slate-600/60 mt-2 pt-1 text-center">
+            <span class="text-[10px] text-slate-400 uppercase tracking-wider font-semibold">Fondo de Pila (Z₀)</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABLA ORGANIZADA DE LA FUNCIÓN DE TRANSICIÓN δ -->
+    <div class="bg-slate-800/80 border border-slate-700 rounded-xl p-4 shadow-md space-y-2.5">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-700/60 pb-2">
+        <span class="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-2">
+          <svg class="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M3 14h18m-9-4v8m-7 4h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          Tabla de Estados y Transiciones δ: Q × (Σ ∪ {ε}) × Γ → P(Q × Γ*)
+        </span>
+        <span class="text-[11px] text-blue-300 font-mono bg-blue-950/60 px-2 py-0.5 rounded border border-blue-500/30">
+          La fila activa se resalta en azul al ejecutarse
+        </span>
+      </div>
+
+      <div class="overflow-x-auto max-h-[300px] border border-slate-700/70 rounded-lg">
+        <table class="w-full text-left text-xs font-mono border-collapse">
+          <thead class="bg-slate-900/95 text-slate-300 uppercase text-[10px] tracking-wider border-b border-slate-700 sticky top-0 shadow-sm z-10">
+            <tr>
+              <th class="py-2.5 px-3">#</th>
+              <th class="py-2.5 px-3">Estado Actual (q)</th>
+              <th class="py-2.5 px-3">Símbolo (a)</th>
+              <th class="py-2.5 px-3">Tope Pila / Pop (X)</th>
+              <th class="py-2.5 px-3">Estado Sig. (p)</th>
+              <th class="py-2.5 px-3">Entra Pila / Push (α)</th>
+              <th class="py-2.5 px-3">Formato Arista: (a, X, α)</th>
+              <th class="py-2.5 px-3 hidden md:table-cell">Mapeo Formal δ(q, a, X)</th>
+            </tr>
+          </thead>
+          <tbody id="transitionsTableBody" class="divide-y divide-slate-800/60 bg-slate-950/40">
+            <!-- Rellenado dinámicamente -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- TARJETA DE ACCIÓN INSTANTÁNEA (PASO ACTUAL) -->
+    <div id="stepBreakdownCard" class="bg-slate-800/90 border border-blue-500/30 rounded-xl p-4 shadow-lg space-y-3">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-bold text-blue-300 uppercase tracking-wider">Desglose de la Transición Ejecutada</span>
+        <div id="verdictBadge" class="hidden px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider"></div>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-5 gap-2.5 text-xs font-mono">
+        <div class="bg-slate-900 rounded-lg p-2.5 border border-slate-700/60">
+          <span class="text-[10px] text-slate-400 uppercase font-sans font-semibold block">Transición Estados</span>
+          <span id="stepStates" class="text-white font-bold text-sm block mt-0.5">q₀ (Inicio)</span>
+        </div>
+        <div class="bg-slate-900 rounded-lg p-2.5 border border-emerald-500/40">
+          <span class="text-[10px] text-emerald-400 uppercase font-sans font-semibold block">✔ Tomado en este paso</span>
+          <span id="stepConsumed" class="text-emerald-300 font-bold text-sm block mt-0.5">Ninguno aún</span>
+        </div>
+        <div class="bg-slate-900 rounded-lg p-2.5 border border-rose-500/40">
+          <span class="text-[10px] text-rose-400 uppercase font-sans font-semibold block">Tope / Pop (Sale)</span>
+          <span id="stepPop" class="text-rose-300 font-bold text-sm block mt-0.5">-</span>
+        </div>
+        <div class="bg-slate-900 rounded-lg p-2.5 border border-purple-500/40">
+          <span class="text-[10px] text-purple-400 uppercase font-sans font-semibold block">Push (Entra a pila)</span>
+          <span id="stepPush" class="text-purple-300 font-bold text-sm block mt-0.5">[Z₀]</span>
+        </div>
+        <div class="bg-slate-900 rounded-lg p-2.5 border border-blue-500/40">
+          <span class="text-[10px] text-blue-400 uppercase font-sans font-semibold block">▶ Siguiente en espera</span>
+          <span id="stepNext" class="text-blue-300 font-bold text-sm block mt-0.5">-</span>
+        </div>
+      </div>
+
+      <!-- Explicación Pedagógica del Paso -->
+      <div class="bg-slate-900/80 p-3 rounded-lg border border-slate-700/80 text-xs text-slate-300 flex items-start gap-2.5">
+        <div class="p-1 rounded bg-blue-500/20 text-blue-400 mt-0.5">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+        </div>
+        <div id="stepExplanation" class="flex-1 leading-relaxed">
+          Presiona <strong>Paso a Paso</strong> o <strong>Auto</strong> para comenzar a simular.
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    // ==========================================
+    // DEFINICIÓN DE LOS 8 AUTÓMATAS (4 DPDA + 4 NPDA)
+    // ORGANIZADOS Y VERIFICADOS MATEMÁTICAMENTE
+    // ==========================================
+    const AUTOMATA = {
+      // ------------------------------------------
+      // 1. PALÍNDROMO CON CENTRO (DPDA)
+      // ------------------------------------------
+      palindrome_center: {
+        id: "palindrome_center",
+        name: "1. Palíndromo con Centro (w c wᴿ)",
+        type: "DPDA",
+        tuple: {
+          Q: "{ q₀, q₁, q₂ }",
+          Sigma: "{ a, b, c }",
+          Gamma: "{ Z₀, A, B }",
+          q0: "q₀",
+          Z0: "Z₀",
+          F: "{ q₂ }"
+        },
+        why: "El marcador central 'c' actúa como señal determinista inequívoca. El autómata sabe exactamente cuándo terminar de apilar y comenzar a desapilar y comparar.",
+        blindReader: "El lector ciego nunca duda: mientras lea 'a' o 'b' en q₀, apila. En cuanto lee 'c', pasa inmediatamente a q₁ sin necesidad de conjeturas.",
+        initialState: "q0",
+        finalStates: ["q2"],
+        stackBottom: "Z₀",
+        defaultInput: "abcba",
+        presets: ["abcba", "c", "abacaba", "abbcbba", "abcb", "acb"],
+        nodes: [
+          { id: "q0", label: "q₀", x: 110, y: 135, isInitial: true, isFinal: false },
+          { id: "q1", label: "q₁", x: 310, y: 135, isInitial: false, isFinal: false },
+          { id: "q2", label: "q₂", x: 500, y: 135, isInitial: false, isFinal: true }
+        ],
+        transitions: [
+          // Desde q0 (Fase 1: Apilamiento de w)
+          { from: "q0", to: "q0", input: "a", pop: "Z₀", push: ["A", "Z₀"], curvature: -45 },
+          { from: "q0", to: "q0", input: "b", pop: "Z₀", push: ["B", "Z₀"], curvature: -75 },
+          { from: "q0", to: "q0", input: "a", pop: "A", push: ["A", "A"], curvature: -45 },
+          { from: "q0", to: "q0", input: "a", pop: "B", push: ["A", "B"], curvature: 45 },
+          { from: "q0", to: "q0", input: "b", pop: "A", push: ["B", "A"], curvature: 45 },
+          { from: "q0", to: "q0", input: "b", pop: "B", push: ["B", "B"], curvature: 75 },
+          // Desde q0 (Detección del marcador 'c')
+          { from: "q0", to: "q1", input: "c", pop: "Z₀", push: ["Z₀"], curvature: 0 },
+          { from: "q0", to: "q1", input: "c", pop: "A", push: ["A"], curvature: -25 },
+          { from: "q0", to: "q1", input: "c", pop: "B", push: ["B"], curvature: 25 },
+          // Desde q1 (Fase 2: Desapilamiento y cotejo de w^R)
+          { from: "q1", to: "q1", input: "a", pop: "A", push: [], curvature: -45 },
+          { from: "q1", to: "q1", input: "b", pop: "B", push: [], curvature: 45 },
+          // Desde q1 (Aceptación al verificar centinela Z0 en fin de cinta)
+          { from: "q1", to: "q2", input: "ε", pop: "Z₀", push: ["Z₀"], curvature: 0, requiresEOF: true }
+        ]
+      },
+
+      // ------------------------------------------
+      // 2. aⁿ b²ⁿ (DPDA)
+      // ------------------------------------------
+      anb2n: {
+        id: "anb2n",
+        name: "2. aⁿ b²ⁿ (Doble de b que de a)",
+        type: "DPDA",
+        tuple: {
+          Q: "{ q₀, q₁, q₂ }",
+          Sigma: "{ a, b }",
+          Gamma: "{ Z₀, A }",
+          q0: "q₀",
+          Z0: "Z₀",
+          F: "{ q₂ }"
+        },
+        why: "La razón de apilamiento es estrictamente 1:2. Por cada 'a' de entrada se apilan dos 'A', y cada 'b' desapila una sola 'A'. Cada paso está unívocamente determinado.",
+        blindReader: "En q₀ solo puede apilar 'a'. Al llegar la primera 'b', transita forzosamente a q₁, donde jamás podrá volver a leer 'a'. Cero ambigüedad.",
+        initialState: "q0",
+        finalStates: ["q2"],
+        stackBottom: "Z₀",
+        defaultInput: "abb",
+        presets: ["abb", "aabbbb", "aaabbbbbb", "ab", "abbb", "aab"],
+        nodes: [
+          { id: "q0", label: "q₀", x: 110, y: 135, isInitial: true, isFinal: false },
+          { id: "q1", label: "q₁", x: 310, y: 135, isInitial: false, isFinal: false },
+          { id: "q2", label: "q₂", x: 500, y: 135, isInitial: false, isFinal: true }
+        ],
+        transitions: [
+          // Desde q0 (Fase 1: Lectura de a y duplicación en pila)
+          { from: "q0", to: "q0", input: "a", pop: "Z₀", push: ["A", "A", "Z₀"], curvature: -45 },
+          { from: "q0", to: "q0", input: "a", pop: "A", push: ["A", "A", "A"], curvature: -75 },
+          // Transición al iniciar el bloque de b
+          { from: "q0", to: "q1", input: "b", pop: "A", push: [], curvature: 0 },
+          // Desde q1 (Fase 2: Consumo de b desapilando 1:1)
+          { from: "q1", to: "q1", input: "b", pop: "A", push: [], curvature: -45 },
+          // Desde q1 (Aceptación en fin de cinta)
+          { from: "q1", to: "q2", input: "ε", pop: "Z₀", push: ["Z₀"], curvature: 0, requiresEOF: true }
+        ]
+      },
+
+      // ------------------------------------------
+      // 3. IGUAL NÚMERO DE a Y b (DPDA)
+      // ------------------------------------------
+      equal_ab: {
+        id: "equal_ab",
+        name: "3. Igual número de a y b (Cualquier orden)",
+        type: "DPDA",
+        tuple: {
+          Q: "{ q₀, q₁ }",
+          Sigma: "{ a, b }",
+          Gamma: "{ Z₀, A, B }",
+          q0: "q₀",
+          Z0: "Z₀",
+          F: "{ q₁ }"
+        },
+        why: "La pila funciona como un contador algebraico con signo: apila 'A' si hay superávit de 'a', o 'B' si hay superávit de 'b'. La cima siempre dicta deterministamente si apilar o cancelar.",
+        blindReader: "Si el tope es Z₀ y lee 'a', apila A. Si el tope es B y lee 'a', cancela (pop). Solo al llegar al fin de cinta (EOF) con saldo Z₀ acepta en q₁.",
+        initialState: "q0",
+        finalStates: ["q1"],
+        stackBottom: "Z₀",
+        defaultInput: "abba",
+        presets: ["abba", "ab", "ba", "aababb", "bbaa", "aab", "bbba"],
+        nodes: [
+          { id: "q0", label: "q₀", x: 180, y: 135, isInitial: true, isFinal: false },
+          { id: "q1", label: "q₁", x: 440, y: 135, isInitial: false, isFinal: true }
+        ],
+        transitions: [
+          // Desde q0 (Crecimiento o cancelación según el tope de pila)
+          { from: "q0", to: "q0", input: "a", pop: "Z₀", push: ["A", "Z₀"], curvature: -45 },
+          { from: "q0", to: "q0", input: "b", pop: "Z₀", push: ["B", "Z₀"], curvature: 45 },
+          { from: "q0", to: "q0", input: "a", pop: "A", push: ["A", "A"], curvature: -75 },
+          { from: "q0", to: "q0", input: "b", pop: "A", push: [], curvature: -25 },
+          { from: "q0", to: "q0", input: "b", pop: "B", push: ["B", "B"], curvature: 75 },
+          { from: "q0", to: "q0", input: "a", pop: "B", push: [], curvature: 25 },
+          // Desde q0 (Aceptación únicamente cuando termina la cinta y el saldo es Z₀)
+          { from: "q0", to: "q1", input: "ε", pop: "Z₀", push: ["Z₀"], curvature: 0, requiresEOF: true }
+        ]
+      },
+
+      // ------------------------------------------
+      // 4. aⁿ bᵐ con n ≠ m (DPDA)
+      // ------------------------------------------
+      anbm_notequal: {
+        id: "anbm_notequal",
+        name: "4. aⁿ bᵐ con n ≠ m (Distinta cantidad)",
+        type: "DPDA",
+        tuple: {
+          Q: "{ q₀, q₁, q₂, q₃ }",
+          Sigma: "{ a, b }",
+          Gamma: "{ Z₀, A }",
+          q0: "q₀",
+          Z0: "Z₀",
+          F: "{ q₂, q₃ }"
+        },
+        why: "Se comprueba la diferencia comparando 1:1. Si al terminar la cadena sobran 'A' en la pila, n > m (acepta en q₂). Si la pila llega a Z₀ y todavía quedan 'b' en la cinta, m > n (acepta en q₃). Ambos caminos son mutuamente excluyentes.",
+        blindReader: "El autómata nunca duda entre ramas. Si n = m, la cadena termina justo en Z₀ dentro de q₁, bloqueándose sin aceptar porque q₁ no es final.",
+        initialState: "q0",
+        finalStates: ["q2", "q3"],
+        stackBottom: "Z₀",
+        defaultInput: "aab",
+        presets: ["aab", "abb", "aaab", "abbb", "ab", "aabb"],
+        nodes: [
+          { id: "q0", label: "q₀", x: 90, y: 135, isInitial: true, isFinal: false },
+          { id: "q1", label: "q₁", x: 260, y: 135, isInitial: false, isFinal: false },
+          { id: "q2", label: "q₂ (n>m)", x: 450, y: 75, isInitial: false, isFinal: true },
+          { id: "q3", label: "q₃ (n<m)", x: 450, y: 195, isInitial: false, isFinal: true }
+        ],
+        transitions: [
+          // Desde q0 (Fase 1: Apilar todas las 'a')
+          { from: "q0", to: "q0", input: "a", pop: "Z₀", push: ["A", "Z₀"], curvature: -45 },
+          { from: "q0", to: "q0", input: "a", pop: "A", push: ["A", "A"], curvature: -75 },
+          // Transición al comenzar las 'b'
+          { from: "q0", to: "q1", input: "b", pop: "A", push: [], curvature: 0 },
+          // Desde q1 (Fase 2: Desapilar 'a' por cada 'b')
+          { from: "q1", to: "q1", input: "b", pop: "A", push: [], curvature: -45 },
+          // Caso n > m: se agotó la cinta (EOF) pero quedan 'A' en la pila
+          { from: "q1", to: "q2", input: "ε", pop: "A", push: ["A"], curvature: -25, requiresEOF: true },
+          // Caso m > n: se agotó la pila (Z₀) pero todavía entra otra 'b'
+          { from: "q1", to: "q3", input: "b", pop: "Z₀", push: ["Z₀"], curvature: 25 },
+          // Desde q3: consumir cualquier otra 'b' excedente
+          { from: "q3", to: "q3", input: "b", pop: "Z₀", push: ["Z₀"], curvature: 45 }
+        ]
+      },
+
+      // ------------------------------------------
+      // 5. PALÍNDROMO PAR SIN CENTRO (NPDA)
+      // ------------------------------------------
+      palindrome_nocenter: {
+        id: "palindrome_nocenter",
+        name: "5. Palíndromo Par sin Centro (w wᴿ)",
+        type: "NPDA",
+        tuple: {
+          Q: "{ q₀, q₁, q₂ }",
+          Sigma: "{ a, b }",
+          Gamma: "{ Z₀, A, B }",
+          q0: "q₀",
+          Z0: "Z₀",
+          F: "{ q₂ }"
+        },
+        why: "No existe un marcador visible en el centro. El autómata debe usar transiciones épsilon (ε) no deterministas para 'adivinar' cuándo terminó la primera mitad w y comenzó el reverso wᴿ.",
+        blindReader: "Al leer cualquier símbolo, el autómata tiene dos caminos válidos simultáneos: o seguir apilando creyendo que sigue en w, o saltar a q₁ conjeturando que alcanzó la mitad exacta.",
+        initialState: "q0",
+        finalStates: ["q2"],
+        stackBottom: "Z₀",
+        defaultInput: "abba",
+        presets: ["abba", "baab", "aabbaa", "aaaa", "aba", "ab"],
+        nodes: [
+          { id: "q0", label: "q₀", x: 110, y: 135, isInitial: true, isFinal: false },
+          { id: "q1", label: "q₁", x: 310, y: 135, isInitial: false, isFinal: false },
+          { id: "q2", label: "q₂", x: 500, y: 135, isInitial: false, isFinal: true }
+        ],
+        transitions: [
+          // Desde q0 (Ruta A: Seguir apilando en la primera mitad)
+          { from: "q0", to: "q0", input: "a", pop: "Z₀", push: ["A", "Z₀"], curvature: -45 },
+          { from: "q0", to: "q0", input: "b", pop: "Z₀", push: ["B", "Z₀"], curvature: -75 },
+          { from: "q0", to: "q0", input: "a", pop: "A", push: ["A", "A"], curvature: -45 },
+          { from: "q0", to: "q0", input: "a", pop: "B", push: ["A", "B"], curvature: 45 },
+          { from: "q0", to: "q0", input: "b", pop: "A", push: ["B", "A"], curvature: 45 },
+          { from: "q0", to: "q0", input: "b", pop: "B", push: ["B", "B"], curvature: 75 },
+          // Desde q0 (Ruta B: Conjetura no determinista ε del punto de inflexión)
+          { from: "q0", to: "q1", input: "ε", pop: "Z₀", push: ["Z₀"], curvature: 0 },
+          { from: "q0", to: "q1", input: "ε", pop: "A", push: ["A"], curvature: -30 },
+          { from: "q0", to: "q1", input: "ε", pop: "B", push: ["B"], curvature: 30 },
+          // Desde q1 (Fase 2: Desapilar y verificar el reverso)
+          { from: "q1", to: "q1", input: "a", pop: "A", push: [], curvature: -45 },
+          { from: "q1", to: "q1", input: "b", pop: "B", push: [], curvature: 45 },
+          // Desde q1 (Aceptación final en EOF)
+          { from: "q1", to: "q2", input: "ε", pop: "Z₀", push: ["Z₀"], curvature: 0, requiresEOF: true }
+        ]
+      },
+
+      // ------------------------------------------
+      // 6. UNIÓN { aⁿ bⁿ } ∪ { aⁿ b²ⁿ } (NPDA)
+      // ------------------------------------------
+      union_anbn_anb2n: {
+        id: "union_anbn_anb2n",
+        name: "6. Unión { aⁿ bⁿ } ∪ { aⁿ b²ⁿ }",
+        type: "NPDA",
+        tuple: {
+          Q: "{ q₀, q₁, q₂, q₃, q₄, q_f }",
+          Sigma: "{ a, b }",
+          Gamma: "{ Z₀, A }",
+          q0: "q₀",
+          Z0: "Z₀",
+          F: "{ q_f }"
+        },
+        why: "Al leer el primer bloque de 'a', el autómata no puede predecir cuántas 'b' vendrán al final. Debe bifurcarse no deterministamente en q₀: una rama apilará 1 'A' por 'a' (para aⁿbⁿ), y la otra apilará 2 'A' por 'a' (para aⁿb²ⁿ).",
+        blindReader: "Un DPDA fallaría porque la pila no se puede reescribir retrospectivamente. El NPDA clona su ejecución explorando ambas proporciones a la vez.",
+        initialState: "q0",
+        finalStates: ["q_f"],
+        stackBottom: "Z₀",
+        defaultInput: "ab",
+        presets: ["ab", "abb", "aabb", "aabbbb", "abab", "aabbb"],
+        nodes: [
+          { id: "q0", label: "q₀", x: 80, y: 135, isInitial: true, isFinal: false },
+          { id: "q1", label: "q₁ (1:1 a)", x: 210, y: 70, isInitial: false, isFinal: false },
+          { id: "q2", label: "q₂ (1:1 b)", x: 350, y: 70, isInitial: false, isFinal: false },
+          { id: "q3", label: "q₃ (1:2 a)", x: 210, y: 200, isInitial: false, isFinal: false },
+          { id: "q4", label: "q₄ (1:2 b)", x: 350, y: 200, isInitial: false, isFinal: false },
+          { id: "q_f", label: "q_f (Fin)", x: 490, y: 135, isInitial: false, isFinal: true }
+        ],
+        transitions: [
+          // Desde q0 (Bifurcación no determinista inicial)
+          { from: "q0", to: "q1", input: "ε", pop: "Z₀", push: ["Z₀"], curvature: -25 },
+          { from: "q0", to: "q3", input: "ε", pop: "Z₀", push: ["Z₀"], curvature: 25 },
+          // Rama 1:1 (Lenguaje aⁿ bⁿ)
+          { from: "q1", to: "q1", input: "a", pop: "Z₀", push: ["A", "Z₀"], curvature: -45 },
+          { from: "q1", to: "q1", input: "a", pop: "A", push: ["A", "A"], curvature: -75 },
+          { from: "q1", to: "q2", input: "b", pop: "A", push: [], curvature: 0 },
+          { from: "q2", to: "q2", input: "b", pop: "A", push: [], curvature: -45 },
+          { from: "q2", to: "q_f", input: "ε", pop: "Z₀", push: ["Z₀"], curvature: 20, requiresEOF: true },
+          // Rama 1:2 (Lenguaje aⁿ b²ⁿ)
+          { from: "q3", to: "q3", input: "a", pop: "Z₀", push: ["A", "A", "Z₀"], curvature: 45 },
+          { from: "q3", to: "q3", input: "a", pop: "A", push: ["A", "A", "A"], curvature: 75 },
+          { from: "q3", to: "q4", input: "b", pop: "A", push: [], curvature: 0 },
+          { from: "q4", to: "q4", input: "b", pop: "A", push: [], curvature: 45 },
+          { from: "q4", to: "q_f", input: "ε", pop: "Z₀", push: ["Z₀"], curvature: -20, requiresEOF: true }
+        ]
+      },
+
+      // ------------------------------------------
+      // 7. UNIÓN { aⁿ bⁿ cᵐ } ∪ { aⁿ bᵐ cᵐ } (NPDA)
+      // ------------------------------------------
+      union_anbncm_anbmcm: {
+        id: "union_anbncm_anbmcm",
+        name: "7. Unión { aⁿ bⁿ cᵐ } ∪ { aⁿ bᵐ cᵐ }",
+        type: "NPDA",
+        tuple: {
+          Q: "{ q₀, q₁, q₂, q₃, q₄, q₅, q₆, q_f }",
+          Sigma: "{ a, b, c }",
+          Gamma: "{ Z₀, A, B }",
+          q0: "q₀",
+          Z0: "Z₀",
+          F: "{ q_f }"
+        },
+        why: "Ejemplo clásico de lenguaje libre de contexto inherentemente ambiguo. La pila LIFO solo puede comparar un par adyacente: o empareja (a con b), o empareja (b con c). El autómata debe adivinar en q₀ cuál relación verificar.",
+        blindReader: "Un DPDA no puede almacenar 'a' y luego decidir si cancelarlo con 'b' o ignorarlo para comparar 'b' con 'c'. El NPDA explora ambas suposiciones en paralelo.",
+        initialState: "q0",
+        finalStates: ["q_f"],
+        stackBottom: "Z₀",
+        defaultInput: "abc",
+        presets: ["abc", "aabbc", "abbcc", "aabbcc", "abbbc", "aabccc"],
+        nodes: [
+          { id: "q0", label: "q₀", x: 70, y: 135, isInitial: true, isFinal: false },
+          { id: "q1", label: "q₁ (a)", x: 180, y: 65, isInitial: false, isFinal: false },
+          { id: "q2", label: "q₂ (b)", x: 290, y: 65, isInitial: false, isFinal: false },
+          { id: "q3", label: "q₃ (c)", x: 400, y: 65, isInitial: false, isFinal: false },
+          { id: "q4", label: "q₄ (a)", x: 180, y: 205, isInitial: false, isFinal: false },
+          { id: "q5", label: "q₅ (b)", x: 290, y: 205, isInitial: false, isFinal: false },
+          { id: "q6", label: "q₆ (c)", x: 400, y: 205, isInitial: false, isFinal: false },
+          { id: "q_f", label: "q_f (Fin)", x: 510, y: 135, isInitial: false, isFinal: true }
+        ],
+        transitions: [
+          // Desde q0 (Bifurcación no determinista)
+          { from: "q0", to: "q1", input: "ε", pop: "Z₀", push: ["Z₀"], curvature: -25 },
+          { from: "q0", to: "q4", input: "ε", pop: "Z₀", push: ["Z₀"], curvature: 25 },
+          // Rama Superior: aⁿ bⁿ cᵐ (Emparejar a con b, c independiente)
+          { from: "q1", to: "q1", input: "a", pop: "Z₀", push: ["A", "Z₀"], curvature: -40 },
+          { from: "q1", to: "q1", input: "a", pop: "A", push: ["A", "A"], curvature: -65 },
+          { from: "q1", to: "q2", input: "b", pop: "A", push: [], curvature: 0 },
+          { from: "q2", to: "q2", input: "b", pop: "A", push: [], curvature: -40 },
+          { from: "q2", to: "q3", input: "ε", pop: "Z₀", push: ["Z₀"], curvature: 0 },
+          { from: "q3", to: "q3", input: "c", pop: "Z₀", push: ["Z₀"], curvature: -40 },
+          { from: "q3", to: "q_f", input: "ε", pop: "Z₀", push: ["Z₀"], curvature: 20, requiresEOF: true },
+          // Rama Inferior: aⁿ bᵐ cᵐ (a independiente, emparejar b con c)
+          { from: "q4", to: "q4", input: "a", pop: "Z₀", push: ["Z₀"], curvature: 35 },
+          { from: "q4", to: "q5", input: "b", pop: "Z₀", push: ["B", "Z₀"], curvature: 0 },
+          { from: "q5", to: "q5", input: "b", pop: "B", push: ["B", "B"], curvature: 55 },
+          { from: "q5", to: "q6", input: "c", pop: "B", push: [], curvature: 0 },
+          { from: "q6", to: "q6", input: "c", pop: "B", push: [], curvature: 35 },
+          { from: "q6", to: "q_f", input: "ε", pop: "Z₀", push: ["Z₀"], curvature: -20, requiresEOF: true }
+        ]
+      },
+
+      // ------------------------------------------
+      // 8. PALÍNDROMO IMPAR SIN CENTRO (NPDA)
+      // ------------------------------------------
+      palindrome_odd: {
+        id: "palindrome_odd",
+        name: "8. Palíndromo Impar sin Centro (w σ wᴿ)",
+        type: "NPDA",
+        tuple: {
+          Q: "{ q₀, q₁, q₂ }",
+          Sigma: "{ a, b }",
+          Gamma: "{ Z₀, A, B }",
+          q0: "q₀",
+          Z0: "Z₀",
+          F: "{ q₂ }"
+        },
+        why: "El carácter del medio σ ∈ {a, b} es idéntico a las letras de la palabra y no está marcado. El autómata debe adivinar no deterministamente cuál letra representa el pivote central sin alteración de pila.",
+        blindReader: "En cada carácter, el autómata conjetura si es parte de w (apilándolo) o si es el pivote central solitario σ (consumiéndolo y pasando a q₁ para desapilar).",
+        initialState: "q0",
+        finalStates: ["q2"],
+        stackBottom: "Z₀",
+        defaultInput: "aba",
+        presets: ["aba", "ababa", "abbba", "aabaa", "a", "b", "abba"],
+        nodes: [
+          { id: "q0", label: "q₀", x: 110, y: 135, isInitial: true, isFinal: false },
+          { id: "q1", label: "q₁", x: 310, y: 135, isInitial: false, isFinal: false },
+          { id: "q2", label: "q₂", x: 500, y: 135, isInitial: false, isFinal: true }
+        ],
+        transitions: [
+          // Desde q0 (Ruta A: Apilar caracteres de la primera mitad w)
+          { from: "q0", to: "q0", input: "a", pop: "Z₀", push: ["A", "Z₀"], curvature: -45 },
+          { from: "q0", to: "q0", input: "b", pop: "Z₀", push: ["B", "Z₀"], curvature: -75 },
+          { from: "q0", to: "q0", input: "a", pop: "A", push: ["A", "A"], curvature: -45 },
+          { from: "q0", to: "q0", input: "a", pop: "B", push: ["A", "B"], curvature: 45 },
+          { from: "q0", to: "q0", input: "b", pop: "A", push: ["B", "A"], curvature: 45 },
+          { from: "q0", to: "q0", input: "b", pop: "B", push: ["B", "B"], curvature: 75 },
+          // Desde q0 (Ruta B: Conjetura del pivote central σ - se consume sin alterar la pila)
+          { from: "q0", to: "q1", input: "a", pop: "Z₀", push: ["Z₀"], curvature: 0 },
+          { from: "q0", to: "q1", input: "b", pop: "Z₀", push: ["Z₀"], curvature: -20 },
+          { from: "q0", to: "q1", input: "a", pop: "A", push: ["A"], curvature: -35 },
+          { from: "q0", to: "q1", input: "a", pop: "B", push: ["B"], curvature: -50 },
+          { from: "q0", to: "q1", input: "b", pop: "A", push: ["A"], curvature: 35 },
+          { from: "q0", to: "q1", input: "b", pop: "B", push: ["B"], curvature: 50 },
+          // Desde q1 (Fase 2: Desapilar cotejando con el reverso w^R)
+          { from: "q1", to: "q1", input: "a", pop: "A", push: [], curvature: -45 },
+          { from: "q1", to: "q1", input: "b", pop: "B", push: [], curvature: 45 },
+          // Desde q1 (Aceptación final en EOF)
+          { from: "q1", to: "q2", input: "ε", pop: "Z₀", push: ["Z₀"], curvature: 0, requiresEOF: true }
+        ]
+      }
+    };
+
+    // ==========================================
+    // ESTADO GLOBAL DE LA SIMULACIÓN
+    // ==========================================
+    let currentKey = "palindrome_center";
+    let tape = [];
+    let tapeIndex = 0;
+    let lastConsumedIndex = -1;
+    let timerId = null;
+    let isFinished = false;
+    let activeTransitionIndex = -1;
+
+    // Motor de bifurcación de ramas (NPDA & DPDA)
+    let branchCounter = 0;
+    let branches = [];
+
+    // Elementos DOM
+    const exampleSelect = document.getElementById("exampleSelect");
+    const exampleTitle = document.getElementById("exampleTitle");
+    const typeBadge = document.getElementById("typeBadge");
+    const whyText = document.getElementById("whyText");
+    const blindReaderText = document.getElementById("blindReaderText");
+    const classificationCard = document.getElementById("classificationCard");
+    const branchStatusContainer = document.getElementById("branchStatusContainer");
+    const activeBranchesCount = document.getElementById("activeBranchesCount");
+
+    const inputString = document.getElementById("inputString");
+    const btnLoad = document.getElementById("btnLoad");
+    const btnStep = document.getElementById("btnStep");
+    const btnPlay = document.getElementById("btnPlay");
+    const playIcon = document.getElementById("playIcon");
+    const playText = document.getElementById("playText");
+    const btnReset = document.getElementById("btnReset");
+    const speedRange = document.getElementById("speedRange");
+    const presetBadges = document.getElementById("presetBadges");
+
+    const tapeContainer = document.getElementById("tapeContainer");
+    const tapePositionLabel = document.getElementById("tapePositionLabel");
+    const stackContainer = document.getElementById("stackContainer");
+    const stackSizeLabel = document.getElementById("stackSizeLabel");
+    const graphSvg = document.getElementById("graphSvg");
+    const transitionsTableBody = document.getElementById("transitionsTableBody");
+
+    const tupleQ = document.getElementById("tupleQ");
+    const tupleSigma = document.getElementById("tupleSigma");
+    const tupleGamma = document.getElementById("tupleGamma");
+    const tupleQ0 = document.getElementById("tupleQ0");
+    const tupleZ0 = document.getElementById("tupleZ0");
+    const tupleF = document.getElementById("tupleF");
+
+    const stepStates = document.getElementById("stepStates");
+    const stepConsumed = document.getElementById("stepConsumed");
+    const stepPop = document.getElementById("stepPop");
+    const stepPush = document.getElementById("stepPush");
+    const stepNext = document.getElementById("stepNext");
+    const stepExplanation = document.getElementById("stepExplanation");
+    const verdictBadge = document.getElementById("verdictBadge");
+
+    function formatTriple(input, pop, push) {
+      const takenStr = input === "" || input === "ε" ? "ε" : input;
+      const popStr = pop === "" || pop === "ε" ? "ε" : pop;
+      const pushStr = (!push || push.length === 0) ? "ε" : push.join("");
+      return `(${takenStr}, ${popStr}, ${pushStr})`;
+    }
+
+    function populateSelector() {
+      exampleSelect.innerHTML = "";
+      
+      const groupDPDA = document.createElement("optgroup");
+      groupDPDA.label = "── 🟢 4 DETERMINISTAS (DPDA) ──";
+      
+      const groupNPDA = document.createElement("optgroup");
+      groupNPDA.label = "── 🟣 4 NO DETERMINISTAS (NPDA) ──";
+
+      Object.keys(AUTOMATA).forEach(key => {
+        const opt = document.createElement("option");
+        opt.value = key;
+        const auto = AUTOMATA[key];
+        opt.textContent = `${auto.type === 'DPDA' ? '🟢' : '🟣'} ${auto.name}`;
+        if (auto.type === 'DPDA') {
+          groupDPDA.appendChild(opt);
+        } else {
+          groupNPDA.appendChild(opt);
+        }
+      });
+
+      exampleSelect.appendChild(groupDPDA);
+      exampleSelect.appendChild(groupNPDA);
+    }
+
+    function initAutomaton(key, customInput = null) {
+      pauseAutoPlay();
+      currentKey = key;
+      const auto = AUTOMATA[key];
+
+      updateClassificationUI(auto);
+      updateTupleUI(auto);
+      renderTransitionsTable(auto);
+
+      const inputVal = customInput !== null ? customInput : auto.defaultInput;
+      inputString.value = inputVal;
+      tape = inputVal.split("");
+      tapeIndex = 0;
+      lastConsumedIndex = -1;
+      isFinished = false;
+      activeTransitionIndex = -1;
+
+      branchCounter = 1;
+      branches = [{
+        id: branchCounter,
+        state: auto.initialState,
+        stack: [auto.stackBottom],
+        tapeIndex: 0,
+        lastConsumedIndex: -1,
+        lastTransitionIdx: -1,
+        execDetails: null,
+        isAlive: true,
+        isAccepted: false,
+        lastAction: "Inicio"
+      }];
+
+      if (auto.type === "NPDA") {
+        branchStatusContainer.classList.remove("hidden");
+        branchStatusContainer.classList.add("flex");
+        activeBranchesCount.textContent = "1";
+      } else {
+        branchStatusContainer.classList.add("hidden");
+        branchStatusContainer.classList.remove("flex");
+      }
+
+      stepStates.textContent = `[${auto.initialState}] inicial`;
+      stepConsumed.textContent = "Ninguno aún";
+      stepPop.textContent = "-";
+      stepPush.textContent = `[${auto.stackBottom}]`;
+      stepNext.textContent = tape.length > 0 ? `'${tape[0]}' (#1)` : "EOF";
+
+      renderPresets();
+      renderTape();
+      renderMainBranchView();
+      renderStatus(`Estado inicial [${auto.initialState}] con fondo de pila [${auto.stackBottom}]. Presiona <strong>Paso a Paso</strong> para comenzar.`, "neutral");
+    }
+
+    function updateClassificationUI(auto) {
+      exampleTitle.textContent = auto.name;
+      whyText.textContent = auto.why;
+      blindReaderText.textContent = auto.blindReader;
+
+      if (auto.type === "DPDA") {
+        classificationCard.className = "rounded-xl border border-blue-500/40 bg-gradient-to-r from-blue-950/40 to-slate-900 p-4 shadow-md transition-all";
+        typeBadge.className = "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/40";
+        typeBadge.textContent = "🟢 Autómata Determinista (DPDA)";
+      } else {
+        classificationCard.className = "rounded-xl border border-purple-500/40 bg-gradient-to-r from-purple-950/40 to-slate-900 p-4 shadow-md transition-all";
+        typeBadge.className = "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-purple-500/20 text-purple-300 border border-purple-500/40";
+        typeBadge.textContent = "🟣 Autómata NO Determinista (NPDA)";
+      }
+    }
+
+    function updateTupleUI(auto) {
+      tupleQ.textContent = auto.tuple.Q;
+      tupleSigma.textContent = auto.tuple.Sigma;
+      tupleGamma.textContent = auto.tuple.Gamma;
+      tupleQ0.textContent = auto.tuple.q0;
+      tupleZ0.textContent = auto.tuple.Z0;
+      tupleF.textContent = auto.tuple.F;
+    }
+
+    function renderTransitionsTable(auto) {
+      transitionsTableBody.innerHTML = "";
+      let lastFromState = null;
+
+      auto.transitions.forEach((tr, idx) => {
+        // Separador temático por estado de partida
+        if (tr.from !== lastFromState) {
+          lastFromState = tr.from;
+          const groupRow = document.createElement("tr");
+          groupRow.className = "bg-slate-900/90 border-t-2 border-slate-700/80 text-blue-300 font-bold text-[11px]";
+          groupRow.innerHTML = `
+            <td colspan="8" class="py-1 px-3 uppercase tracking-wider text-slate-400 bg-slate-900/90">
+              <span class="inline-flex items-center gap-1.5 text-blue-400 font-semibold">
+                <span class="w-2 h-2 rounded-full bg-blue-500"></span> Transiciones que parten del Estado [${tr.from}]
+              </span>
+            </td>
+          `;
+          transitionsTableBody.appendChild(groupRow);
+        }
+
+        const row = document.createElement("tr");
+        row.id = `trans-row-${idx}`;
+        row.className = "hover:bg-slate-800/60 transition-colors border-b border-slate-800/40 text-[11px]";
+
+        const taken = tr.input === "" ? "ε" : tr.input;
+        const takenHtml = tr.requiresEOF
+          ? `${taken} <span class="text-[9px] ml-1 px-1 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40 font-sans">EOF</span>`
+          : taken;
+        const popVal = tr.pop === "" ? "ε" : tr.pop;
+        const pushVal = (!tr.push || tr.push.length === 0) ? "ε" : tr.push.join("");
+        const triple = formatTriple(tr.input, tr.pop, tr.push);
+        const mappingSymbol = auto.type === "DPDA" ? "=" : "∋";
+        const deltaNotation = `δ(${tr.from}, ${taken}${tr.requiresEOF ? " [EOF]" : ""}, ${popVal}) ${mappingSymbol} (${tr.to}, ${pushVal})`;
+
+        row.innerHTML = `
+          <td class="py-2 px-3 text-slate-500 font-mono text-[10px]">#${idx + 1}</td>
+          <td class="py-2 px-3 font-bold text-blue-300">${tr.from}</td>
+          <td class="py-2 px-3 text-emerald-300 font-bold whitespace-nowrap">${takenHtml}</td>
+          <td class="py-2 px-3 text-rose-300 font-bold">${popVal}</td>
+          <td class="py-2 px-3 font-bold text-indigo-300">${tr.to}</td>
+          <td class="py-2 px-3 text-purple-300 font-bold">${pushVal}</td>
+          <td class="py-2 px-3 text-amber-300 font-bold bg-slate-900/50 rounded">${triple}</td>
+          <td class="py-2 px-3 text-cyan-300 font-mono hidden md:table-cell">${deltaNotation}</td>
+        `;
+        transitionsTableBody.appendChild(row);
+      });
+    }
+
+    function highlightTableRow(index) {
+      const rows = transitionsTableBody.querySelectorAll("tr");
+      rows.forEach(r => r.classList.remove("active-row"));
+
+      if (index >= 0) {
+        const target = document.getElementById(`trans-row-${index}`);
+        if (target) {
+          target.classList.add("active-row");
+          if (typeof target.scrollIntoView === "function") {
+            target.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          }
+        }
+      }
+    }
+
+    function renderPresets() {
+      const auto = AUTOMATA[currentKey];
+      presetBadges.innerHTML = "";
+      auto.presets.forEach(p => {
+        const btn = document.createElement("button");
+        btn.className = "text-xs px-2 py-1 rounded bg-slate-700/80 hover:bg-slate-600 text-slate-300 font-mono transition";
+        btn.textContent = p === "" ? '""' : p;
+        btn.addEventListener("click", () => {
+          initAutomaton(currentKey, p);
+        });
+        presetBadges.appendChild(btn);
+      });
+    }
+
+    function renderTape() {
+      tapeContainer.innerHTML = "";
+      tapePositionLabel.textContent = `Posición Cabezal: ${tapeIndex} / ${tape.length}`;
+
+      tape.forEach((char, index) => {
+        const cell = document.createElement("div");
+        const isProcessed = (index === lastConsumedIndex);
+        const isNext = (index === tapeIndex);
+
+        let cellStyle = "w-11 h-11 flex flex-col items-center justify-center rounded-lg border font-mono text-base font-bold transition-all relative shrink-0 ";
+        
+        if (isProcessed) {
+          cellStyle += "bg-emerald-600 border-emerald-300 text-white shadow-lg ring-2 ring-emerald-400 scale-105";
+        } else if (isNext) {
+          cellStyle += "bg-blue-600/30 border-blue-400 border-dashed text-blue-200 ring-2 ring-blue-500/50";
+        } else if (index < tapeIndex) {
+          cellStyle += "bg-slate-800/50 border-slate-700/50 text-slate-500";
+        } else {
+          cellStyle += "bg-slate-800 border-slate-700 text-slate-200";
+        }
+
+        cell.className = cellStyle;
+        cell.textContent = char;
+
+        if (isProcessed) {
+          const badge = document.createElement("span");
+          badge.className = "text-[9px] leading-none text-emerald-100 font-sans font-semibold mt-0.5";
+          badge.textContent = "✔";
+          cell.appendChild(badge);
+        } else if (isNext) {
+          const badge = document.createElement("span");
+          badge.className = "text-[9px] leading-none text-blue-300 font-sans font-semibold mt-0.5";
+          badge.textContent = "▶";
+          cell.appendChild(badge);
+        }
+
+        tapeContainer.appendChild(cell);
+      });
+
+      // Celda EOF (Fin de Cinta)
+      const eofCell = document.createElement("div");
+      const isEofNext = (tapeIndex >= tape.length);
+      eofCell.className = `w-12 h-11 flex items-center justify-center rounded-lg border font-mono text-xs font-bold shrink-0 ${
+        isEofNext ? "bg-amber-600/30 border-amber-400 border-dashed text-amber-200 ring-2 ring-amber-500/50" : "bg-slate-900 border-slate-800 text-slate-600"
+      }`;
+      eofCell.textContent = "EOF";
+      tapeContainer.appendChild(eofCell);
+
+      if (lastConsumedIndex >= 0) {
+        tapePositionLabel.textContent = `Procesado: ${lastConsumedIndex + 1} de ${tape.length}`;
+      }
+    }
+
+    function canBranchAccept(startBranch, auto, tapeArr) {
+      if (startBranch.isAccepted) return true;
+      if (!startBranch.isAlive) return false;
+
+      const queue = [{
+        state: startBranch.state,
+        stack: [...startBranch.stack],
+        tapeIndex: startBranch.tapeIndex
+      }];
+      const visited = new Set();
+      let iterations = 0;
+
+      while (queue.length > 0 && iterations < 1200) {
+        iterations++;
+        const cur = queue.shift();
+        const sig = `${cur.state}|${cur.tapeIndex}|${cur.stack.join(",")}`;
+        if (visited.has(sig)) continue;
+        visited.add(sig);
+
+        const curChar = (cur.tapeIndex < tapeArr.length) ? tapeArr[cur.tapeIndex] : "ε";
+        const top = cur.stack.length > 0 ? cur.stack[cur.stack.length - 1] : null;
+        if (!top) continue;
+
+        for (const tr of auto.transitions) {
+          if (tr.from !== cur.state || tr.pop !== top) continue;
+          if (tr.requiresEOF) {
+            if (cur.tapeIndex < tapeArr.length) continue;
+          } else if (tr.input !== curChar && tr.input !== "ε") {
+            continue;
+          }
+
+          const nextStack = [...cur.stack];
+          nextStack.pop();
+          for (let i = tr.push.length - 1; i >= 0; i--) {
+            nextStack.push(tr.push[i]);
+          }
+          const consumed = (!tr.requiresEOF && tr.input !== "ε" && curChar !== "ε");
+          const nextTapeIndex = consumed ? cur.tapeIndex + 1 : cur.tapeIndex;
+
+          if (nextTapeIndex >= tapeArr.length && auto.finalStates.includes(tr.to)) {
+            return true;
+          }
+
+          queue.push({
+            state: tr.to,
+            stack: nextStack,
+            tapeIndex: nextTapeIndex
+          });
+        }
+      }
+      return false;
+    }
+
+    function getBestActiveBranch() {
+      const accepted = branches.find(b => b.isAccepted);
+      if (accepted) return accepted;
+      const alive = branches.filter(b => b.isAlive);
+      if (alive.length > 0) {
+        const auto = AUTOMATA[currentKey];
+        const winning = alive.find(b => canBranchAccept(b, auto, tape));
+        if (winning) return winning;
+        return alive.reduce((best, cur) => (cur.tapeIndex > best.tapeIndex ? cur : best), alive[0]);
+      }
+      return branches[0] || null;
+    }
+
+    function renderMainBranchView() {
+      const best = getBestActiveBranch();
+      const stack = best ? best.stack : ["Z₀"];
+
+      stackContainer.innerHTML = "";
+      stackSizeLabel.textContent = `${stack.length} elementos`;
+
+      if (stack.length === 0) {
+        const emptyDiv = document.createElement("div");
+        emptyDiv.className = "text-xs text-rose-400 font-mono py-2 text-center";
+        emptyDiv.textContent = "[PILA VACÍA]";
+        stackContainer.appendChild(emptyDiv);
+      } else {
+        stack.forEach((item, index) => {
+          const isTop = (index === stack.length - 1);
+          const div = document.createElement("div");
+          div.className = `stack-item py-1.5 px-3 rounded font-mono text-center text-sm font-bold border ${
+            isTop 
+              ? "bg-gradient-to-r from-blue-500 to-indigo-600 border-blue-300 text-white shadow-md ring-2 ring-blue-400/30"
+              : item === "Z₀"
+              ? "bg-slate-700 border-slate-600 text-slate-300"
+              : "bg-slate-800 border-slate-700 text-indigo-200"
+          }`;
+          div.innerHTML = `${item} ${isTop ? '<span class="text-[10px] ml-1 bg-blue-900/80 px-1 rounded uppercase tracking-wider">TOP</span>' : ''}`;
+          stackContainer.appendChild(div);
+        });
+      }
+
+      renderGraph();
+      highlightTableRow(activeTransitionIndex);
+    }
+
+    function renderGraph() {
+      const auto = AUTOMATA[currentKey];
+      graphSvg.innerHTML = "";
+
+      const defs = document.createElementNS("http://www.w3.org/2000/svg", "defs");
+      defs.innerHTML = `
+        <marker id="arrow" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+          <path d="M 0 1.5 L 10 5 L 0 8.5 z" fill="#64748b" />
+        </marker>
+        <marker id="arrow-active" viewBox="0 0 10 10" refX="22" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+          <path d="M 0 1.5 L 10 5 L 0 8.5 z" fill="#3b82f6" />
+        </marker>
+      `;
+      graphSvg.appendChild(defs);
+
+      // Agrupar aristas para evitar textos montados
+      const loopGroups = new Map();
+      const edgeGroups = new Map();
+
+      auto.transitions.forEach((tr, idx) => {
+        if (tr.from === tr.to) {
+          const isUp = tr.curvature < 0;
+          const key = `${tr.from}_${isUp ? "top" : "bot"}`;
+          if (!loopGroups.has(key)) loopGroups.set(key, { from: tr.from, isUp, items: [] });
+          loopGroups.get(key).items.push({ tr, idx });
+        } else {
+          const key = `${tr.from}->${tr.to}`;
+          if (!edgeGroups.has(key)) edgeGroups.set(key, { from: tr.from, to: tr.to, items: [] });
+          edgeGroups.get(key).items.push({ tr, idx });
+        }
+      });
+
+      // Dibujar bucles propios agrupados
+      loopGroups.forEach(group => {
+        const fromNode = auto.nodes.find(n => n.id === group.from);
+        if (!fromNode) return;
+        const anyActive = group.items.some(item => item.idx === activeTransitionIndex);
+        const loopRadius = 24;
+        const isUp = group.isUp;
+        const d = `M ${fromNode.x - 12} ${fromNode.y - 12 * (isUp ? 1 : -1)} A ${loopRadius} ${loopRadius} 0 1 ${isUp ? 1 : 0} ${fromNode.x + 12} ${fromNode.y - 12 * (isUp ? 1 : -1)}`;
+
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", d);
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", anyActive ? "#3b82f6" : "#475569");
+        path.setAttribute("stroke-width", anyActive ? "3" : "1.8");
+        path.setAttribute("marker-end", anyActive ? "url(#arrow-active)" : "url(#arrow)");
+        graphSvg.appendChild(path);
+
+        group.items.forEach((item, pos) => {
+          const isItemActive = (item.idx === activeTransitionIndex);
+          const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+          text.setAttribute("x", fromNode.x);
+          text.setAttribute("y", isUp ? (fromNode.y - 46 - pos * 13) : (fromNode.y + 52 + pos * 13));
+          text.setAttribute("text-anchor", "middle");
+          text.setAttribute("fill", isItemActive ? "#93c5fd" : "#94a3b8");
+          text.setAttribute("font-size", "10px");
+          text.setAttribute("font-family", "monospace");
+          text.setAttribute("font-weight", isItemActive ? "bold" : "normal");
+          text.textContent = formatTriple(item.tr.input, item.tr.pop, item.tr.push);
+          graphSvg.appendChild(text);
+        });
+      });
+
+      // Dibujar aristas entre estados distintos agrupadas
+      edgeGroups.forEach(group => {
+        const fromNode = auto.nodes.find(n => n.id === group.from);
+        const toNode = auto.nodes.find(n => n.id === group.to);
+        if (!fromNode || !toNode) return;
+
+        const anyActive = group.items.some(item => item.idx === activeTransitionIndex);
+        const avgCurv = group.items.reduce((acc, it) => acc + it.tr.curvature, 0) / group.items.length;
+        const midX = (fromNode.x + toNode.x) / 2;
+        const ctrlY = (fromNode.y + toNode.y) / 2 + avgCurv;
+        const d = `M ${fromNode.x} ${fromNode.y} Q ${midX} ${ctrlY} ${toNode.x} ${toNode.y}`;
+
+        const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        path.setAttribute("d", d);
+        path.setAttribute("fill", "none");
+        path.setAttribute("stroke", anyActive ? "#3b82f6" : "#475569");
+        path.setAttribute("stroke-width", anyActive ? "3" : "1.8");
+        path.setAttribute("marker-end", anyActive ? "url(#arrow-active)" : "url(#arrow)");
+        graphSvg.appendChild(path);
+
+        // Punto real medio de la curva cuadrática de Bézier: 0.25*P0 + 0.5*C + 0.25*P1
+        const curveMidY = (fromNode.y + toNode.y) / 2 + avgCurv * 0.5;
+        const count = group.items.length;
+        group.items.forEach((item, pos) => {
+          const isItemActive = (item.idx === activeTransitionIndex);
+          const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+          text.setAttribute("x", midX);
+          text.setAttribute("y", (curveMidY - 8) + (pos - (count - 1) / 2) * 12);
+          text.setAttribute("text-anchor", "middle");
+          text.setAttribute("fill", isItemActive ? "#93c5fd" : "#94a3b8");
+          text.setAttribute("font-size", "10px");
+          text.setAttribute("font-family", "monospace");
+          text.setAttribute("font-weight", isItemActive ? "bold" : "normal");
+          const suffix = item.tr.requiresEOF ? " [EOF]" : "";
+          text.textContent = formatTriple(item.tr.input, item.tr.pop, item.tr.push) + suffix;
+          graphSvg.appendChild(text);
+        });
+      });
+
+      const activeBranch = getBestActiveBranch();
+      const currentBranchState = activeBranch ? activeBranch.state : null;
+      const occupiedStates = new Set(branches.filter(b => b.isAlive).map(b => b.state));
+
+      auto.nodes.forEach(node => {
+        const isCurrent = (node.id === currentBranchState);
+        const hasBranch = occupiedStates.has(node.id);
+        const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+
+        if (node.isInitial) {
+          const initArrow = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          initArrow.setAttribute("d", `M ${node.x - 50} ${node.y} L ${node.x - 26} ${node.y}`);
+          initArrow.setAttribute("stroke", "#94a3b8");
+          initArrow.setAttribute("stroke-width", "2");
+          initArrow.setAttribute("marker-end", "url(#arrow)");
+          group.appendChild(initArrow);
+        }
+
+        const circle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        circle.setAttribute("cx", node.x);
+        circle.setAttribute("cy", node.y);
+        circle.setAttribute("r", "23");
+        circle.setAttribute("fill", isCurrent ? "#1e3a8a" : hasBranch ? "#3b0764" : "#0f172a");
+        circle.setAttribute("stroke", isCurrent ? "#60a5fa" : hasBranch ? "#c084fc" : "#475569");
+        circle.setAttribute("stroke-width", isCurrent || hasBranch ? "3" : "2");
+        circle.setAttribute("class", `node-circle ${isCurrent ? 'active-node' : hasBranch ? 'active-branch-node' : ''}`);
+        group.appendChild(circle);
+
+        if (node.isFinal) {
+          const innerCircle = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+          innerCircle.setAttribute("cx", node.x);
+          innerCircle.setAttribute("cy", node.y);
+          innerCircle.setAttribute("r", "18");
+          innerCircle.setAttribute("fill", "none");
+          innerCircle.setAttribute("stroke", isCurrent ? "#60a5fa" : hasBranch ? "#c084fc" : "#475569");
+          innerCircle.setAttribute("stroke-width", "1.5");
+          group.appendChild(innerCircle);
+        }
+
+        const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+        text.setAttribute("x", node.x);
+        text.setAttribute("y", node.y + 4.5);
+        text.setAttribute("text-anchor", "middle");
+        text.setAttribute("fill", isCurrent || hasBranch ? "#ffffff" : "#e2e8f0");
+        text.setAttribute("font-size", "11px");
+        text.setAttribute("font-weight", "bold");
+        text.setAttribute("font-family", "monospace");
+        text.textContent = node.label;
+        group.appendChild(text);
+
+        graphSvg.appendChild(group);
+      });
+    }
+
+    function renderStatus(message, type = "neutral") {
+      stepExplanation.innerHTML = message;
+      if (type === "accepted") {
+        verdictBadge.className = "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 block";
+        verdictBadge.textContent = "✔ Cadena Aceptada";
+      } else if (type === "rejected") {
+        verdictBadge.className = "px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-rose-500/20 text-rose-300 border border-rose-500/50 block";
+        verdictBadge.textContent = "✖ Cadena Rechazada";
+      } else {
+        verdictBadge.className = "hidden";
+      }
+    }
+
+    function step() {
+      if (isFinished) return;
+
+      const auto = AUTOMATA[currentKey];
+      const liveBranches = branches.filter(b => b.isAlive);
+
+      if (liveBranches.length === 0) {
+        isFinished = true;
+        pauseAutoPlay();
+        highlightTableRow(-1);
+        renderStatus(`<strong>Rechazada:</strong> Todas las ramas de ejecución se bloquearon sin alcanzar un estado de aceptación.`, "rejected");
+        return;
+      }
+
+      let newBranches = [];
+      let anyAccepted = false;
+      let logs = [];
+      let lastExecutionDetails = null;
+
+      for (let branch of liveBranches) {
+        const curChar = (branch.tapeIndex < tape.length) ? tape[branch.tapeIndex] : "ε";
+        const top = (branch.stack.length > 0) ? branch.stack[branch.stack.length - 1] : null;
+
+        if (!top) {
+          branch.isAlive = false;
+          continue;
+        }
+
+        let matches = auto.transitions.map((tr, idx) => ({ tr, idx })).filter(item => {
+          if (item.tr.from !== branch.state || item.tr.pop !== top) return false;
+          if (item.tr.requiresEOF) {
+            return branch.tapeIndex >= tape.length;
+          }
+          return item.tr.input === curChar || item.tr.input === "ε";
+        });
+
+        if (matches.length === 0) {
+          branch.isAlive = false;
+          continue;
+        }
+
+        matches.forEach(({ tr, idx }) => {
+          const nextStack = [...branch.stack];
+          nextStack.pop();
+          for (let i = tr.push.length - 1; i >= 0; i--) {
+            nextStack.push(tr.push[i]);
+          }
+
+          const consumed = (!tr.requiresEOF && tr.input !== "ε" && curChar !== "ε");
+          const consumedIdx = consumed ? branch.tapeIndex : -1;
+          const nextTapeIndex = consumed ? branch.tapeIndex + 1 : branch.tapeIndex;
+
+          const isEnd = (nextTapeIndex >= tape.length);
+          const isFinal = auto.finalStates.includes(tr.to);
+          const accepted = (isEnd && isFinal);
+          if (accepted) anyAccepted = true;
+
+          const triple = formatTriple(tr.input, tr.pop, tr.push);
+
+          const execDetails = {
+            from: branch.state,
+            to: tr.to,
+            taken: consumed ? `'${curChar}' (posición #${consumedIdx + 1})` : (tr.requiresEOF ? "ε [EOF] (fin de cinta)" : "ε (transición vacía)"),
+            pop: tr.pop,
+            push: tr.push.length === 0 ? "ε (desapiló / pop)" : `[${tr.push.join("")}]`,
+            triple: triple
+          };
+
+          const newBr = {
+            id: ++branchCounter,
+            state: tr.to,
+            stack: nextStack,
+            tapeIndex: nextTapeIndex,
+            lastConsumedIndex: consumedIdx,
+            lastTransitionIdx: idx,
+            execDetails: execDetails,
+            isAlive: !accepted,
+            isAccepted: accepted,
+            lastAction: `[${branch.state}] → [${tr.to}] con ${triple}`
+          };
+          newBranches.push(newBr);
+
+          logs.push(`Rama #${newBr.id}: Estado <strong>${branch.state} &rarr; ${tr.to}</strong> aplicando regla <strong>${triple}</strong>.`);
+        });
+      }
+
+      branches = newBranches;
+      const focused = getBestActiveBranch();
+      if (focused) {
+        tapeIndex = focused.tapeIndex;
+        lastConsumedIndex = focused.lastConsumedIndex;
+        activeTransitionIndex = focused.lastTransitionIdx;
+        lastExecutionDetails = focused.execDetails;
+      }
+
+      activeBranchesCount.textContent = branches.filter(b => b.isAlive || b.isAccepted).length;
+
+      if (lastExecutionDetails) {
+        stepStates.textContent = `${lastExecutionDetails.from} ➔ ${lastExecutionDetails.to}`;
+        stepConsumed.textContent = lastExecutionDetails.taken;
+        stepPop.textContent = lastExecutionDetails.pop;
+        stepPush.textContent = lastExecutionDetails.push;
+
+        const nextChar = tapeIndex < tape.length ? `'${tape[tapeIndex]}' (posición #${tapeIndex + 1})` : "EOF (Fin de cinta)";
+        stepNext.textContent = nextChar;
+      }
+
+      renderTape();
+      renderMainBranchView();
+
+      if (anyAccepted) {
+        isFinished = true;
+        pauseAutoPlay();
+        const msg = `${logs.slice(0, 3).join("<br>")}<br><strong class="text-emerald-400">¡Cadena ACEPTADA!</strong> Al menos una rama alcanzó el estado final con la entrada agotada.`;
+        renderStatus(msg, "accepted");
+      } else if (branches.filter(b => b.isAlive).length === 0) {
+        isFinished = true;
+        pauseAutoPlay();
+        renderStatus(`${logs.slice(0, 2).join("<br>")}<br><strong class="text-rose-400">Cadena RECHAZADA:</strong> No existen más transiciones posibles para continuar.`, "rejected");
+      } else {
+        const msg = logs.slice(0, 3).join("<br>") + (logs.length > 3 ? `<br><span class="text-slate-400">(y ${logs.length - 3} ramas más en paralelo...)</span>` : "");
+        renderStatus(msg, "neutral");
+      }
+    }
+
+    function toggleAutoPlay() {
+      if (timerId) {
+        pauseAutoPlay();
+      } else {
+        if (isFinished) resetSimulation();
+        playText.textContent = "Pausar";
+        if (playIcon) playIcon.textContent = "⏸";
+        btnPlay.className = "px-4 py-1.5 text-xs font-semibold rounded-lg bg-amber-600 hover:bg-amber-500 active:scale-95 transition text-white shadow-sm flex items-center gap-1";
+        
+        const speed = parseInt(speedRange.value);
+        step();
+        timerId = setInterval(() => {
+          if (isFinished) {
+            pauseAutoPlay();
+          } else {
+            step();
+          }
+        }, speed);
+      }
+    }
+
+    function pauseAutoPlay() {
+      if (timerId) {
+        clearInterval(timerId);
+        timerId = null;
+      }
+      playText.textContent = "Auto";
+      if (playIcon) playIcon.textContent = "▶";
+      btnPlay.className = "px-4 py-1.5 text-xs font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 active:scale-95 transition text-white shadow-sm flex items-center gap-1";
+    }
+
+    function resetSimulation() {
+      initAutomaton(currentKey, inputString.value.trim());
+    }
+
+    // Eventos
+    btnLoad.addEventListener("click", () => {
+      initAutomaton(currentKey, inputString.value.trim());
+    });
+
+    inputString.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") {
+        initAutomaton(currentKey, inputString.value.trim());
+      }
+    });
+
+    btnStep.addEventListener("click", () => {
+      step();
+    });
+
+    btnPlay.addEventListener("click", () => {
+      toggleAutoPlay();
+    });
+
+    btnReset.addEventListener("click", () => {
+      resetSimulation();
+    });
+
+    exampleSelect.addEventListener("change", (e) => {
+      initAutomaton(e.target.value);
+    });
+
+    // Inicialización al cargar la página
+    populateSelector();
+    initAutomaton(currentKey);
+  </script>
+</body>
+</html>
